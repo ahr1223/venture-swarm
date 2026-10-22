@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VentureSwarm — Multi-Agent Autonomous Launch Platform</title>
+  
+  <!-- Fonts: GitHub System Sans + Fira Code / SF Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React 18 & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel Standalone -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', '"Noto Sans"', 'Helvetica', 'Arial', 'sans-serif'],
+            mono: ['"Fira Code"', 'ui-monospace', 'SFMono-Regular', '"SF Mono"', 'Menlo', 'Consolas', '"Liberation Mono"', 'monospace'],
+          },
+          colors: {
+            // Official GitHub Dark Palette (Primer Dark Default)
+            gh: {
+              canvas: '#0d1117',        // Default background
+              subtle: '#161b22',        // Surface / secondary header
+              inset: '#010409',         // Inset dark / inputs / code blocks
+              overlay: '#1f242c',       // Elevated menus / dropdowns
+              border: '#30363d',        // Default border
+              borderMuted: '#21262d',   // Muted separator border
+              fg: '#f0f6fc',            // Primary text (high contrast)
+              fgMuted: '#8b949e',       // Secondary muted text
+              fgSubtle: '#6e7681',      // Tertiary subtle text
+              // Brand accents
+              green: '#238636',         // Primary commit / merge button
+              greenHover: '#2ea043',    // Button hover
+              greenText: '#3fb950',     // Success text & badges
+              blue: '#1f6feb',          // Issue / action blue
+              blueHover: '#388bfd',     // Blue hover
+              blueText: '#58a6ff',      // Link & badge blue
+              purple: '#8957e5',        // PR merged purple
+              purpleText: '#bc8cff',    // Purple text
+              red: '#da3633',           // Flaw / closed red
+              redText: '#f85149',       // Red text
+              orange: '#d29922',        // Warning / debate orange
+              orangeText: '#f0883e',    // Orange text
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #0d1117;
+      color: #f0f6fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* GitHub-style Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d1117;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #30363d;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #8b949e;
+    }
+
+    /* GitHub Button Transitions */
+    .gh-btn-primary {
+      background-color: #238636;
+      border: 1px solid rgba(240, 246, 252, 0.1);
+      box-shadow: 0 1px 0 rgba(27, 31, 36, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      transition: 0.15s cubic-bezier(0.3, 0, 0.5, 1);
+    }
+    .gh-btn-primary:hover:not(:disabled) {
+      background-color: #2ea043;
+      border-color: rgba(240, 246, 252, 0.15);
+    }
+    .gh-btn-primary:active:not(:disabled) {
+      background-color: #238636;
+      box-shadow: inset 0 1px 0 rgba(0, 45, 17, 0.2);
+    }
+
+    .gh-btn-secondary {
+      background-color: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      box-shadow: 0 1px 0 rgba(27, 31, 36, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+      transition: 0.15s cubic-bezier(0.3, 0, 0.5, 1);
+    }
+    .gh-btn-secondary:hover:not(:disabled) {
+      background-color: #30363d;
+      border-color: #8b949e;
+      color: #f0f6fc;
+    }
+
+    /* GitHub Active Node Pulse */
+    @keyframes ghPulse {
+      0%, 100% { border-color: #58a6ff; box-shadow: 0 0 0 1px #58a6ff; }
+      50% { border-color: #1f6feb; box-shadow: 0 0 8px rgba(88, 166, 255, 0.35); }
+    }
+    .gh-active-pulse {
+      animation: ghPulse 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-gh-canvas text-gh-fg antialiased selection:bg-[#1f6feb]/30 selection:text-gh-fg">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Pure React Native SVG Icons (100% Virtual-DOM Safe)
+    function Icon({ name, className = "w-4 h-4" }) {
+      const icons = {
+        gitBranch: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>
+          </svg>
+        ),
+        sliders: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+            <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+            <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+          </svg>
+        ),
+        activity: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        ),
+        play: (
+          <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        ),
+        search: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        ),
+        globe: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        ),
+        users: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        ),
+        penTool: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="11" cy="11" r="2"/>
+          </svg>
+        ),
+        shieldAlert: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        ),
+        box: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+        ),
+        checkCircle: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+        ),
+        terminal: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+        ),
+        gitPullRequest: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/>
+          </svg>
+        ),
+        layout: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>
+          </svg>
+        ),
+        mail: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        ),
+        shield: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        ),
+        database: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+          </svg>
+        ),
+        userCheck: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>
+          </svg>
+        ),
+        layers: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+            <polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+          </svg>
+        ),
+        network: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <rect x="9" y="2" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/>
+            <path d="M12 8v4m-7 4v-2a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2"/>
+          </svg>
+        ),
+        loader2: (
+          <svg className={`${className} animate-spin`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+          </svg>
+        ),
+        download: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        ),
+        xCircle: (
+          <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+        )
+      };
+      return icons[name] || null;
+    }
+
+    // GitHub Dark styled Agent Node Metadata
+    const AGENT_NODES = [
+      { id: "Scout", label: "Scout", role: "Market Discovery", icon: "search", color: "text-gh-blueText" },
+      { id: "Harvester", label: "Harvester", role: "Live Scraper", icon: "globe", color: "text-cyan-400" },
+      { id: "Demographer", label: "Demographer", role: "ICP Architect", icon: "users", color: "text-gh-greenText" },
+      { id: "Wordsmith", label: "Wordsmith", role: "Asset Copywriter", icon: "penTool", color: "text-gh-orangeText" },
+      { id: "Overwatch", label: "Overwatch", role: "Strategist Critic", icon: "shieldAlert", color: "text-gh-redText" },
+      { id: "Foundry", label: "Foundry", role: "Deploy Engine", icon: "box", color: "text-gh-purpleText" }
+    ];
+
+    const TABS = [
+      { id: "landing", label: "Landing Page", icon: "layout" },
+      { id: "emails", label: "Outbound Cadence", icon: "mail" },
+      { id: "battlecard", label: "Competitor Matrix", icon: "shield" },
+      { id: "leads", label: "Leads Database", icon: "database" },
+      { id: "icp", label: "ICP Dossier", icon: "userCheck" }
+    ];
+
+    const SAMPLE_IDEAS = [
+      "B2B Agentic SDR that scrapes LinkedIn jobs and auto-pitches custom Loom videos to VP Sales",
+      "Autonomous SEO Auditor that crawls competitor blogs, finds keyword gaps, and writes ready-to-rank articles",
+      "Vertical ERP and dispatch copilot for residential HVAC and roofing contractors",
+      "Micro-SaaS that monitors Stripe churn and deploys personalized win-back discount sequences automatically"
+    ];
+
+    function App() {
+      const [idea, setIdea] = useState("");
+      const [apiKey, setApiKey] = useState("");
+      const [provider, setProvider] = useState("auto");
+      const [maxDebateRounds, setMaxDebateRounds] = useState(2);
+      const [showSettings, setShowSettings] = useState(false);
+      
+      const [isRunning, setIsRunning] = useState(false);
+      const [activeAgent, setActiveAgent] = useState(null);
+      const [thoughts, setThoughts] = useState([]);
+      const [debateEntries, setDebateEntries] = useState([]);
+      const [finalAssets, setFinalAssets] = useState(null);
+      const [activeTab, setActiveTab] = useState("landing");
+      const [landingPreviewMode, setLandingPreviewMode] = useState("preview"); // preview or code
+      const [copiedText, setCopiedText] = useState("");
+
+      const thoughtsEndRef = useRef(null);
+
+      useEffect(() => {
+        thoughtsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [thoughts]);
+
+      const handleStreamEvent = (event) => {
+        if (event.type === "init") {
+          setThoughts(prev => [...prev, {
+            agent: "system",
+            message: `${event.message} [Engine: ${event.provider_status?.model || 'Active'}]`,
+            status: "system",
+            timestamp: "0.00"
+          }]);
+        } else if (event.type === "thought") {
+          setActiveAgent(event.agent);
+          setThoughts(prev => [...prev, event]);
+
+          // Capture debate entries
+          if (event.payload?.debate_entry) {
+            setDebateEntries(prev => [...prev, event.payload.debate_entry]);
+          }
+        } else if (event.type === "done") {
+          if (event.final_assets) {
+            setFinalAssets(event.final_assets);
+          }
+        } else if (event.type === "error") {
+          setThoughts(prev => [...prev, {
+            agent: "system",
+            message: `Execution error: ${event.error}`,
+            status: "error",
+            timestamp: "ERR"
+          }]);
+        }
+      };
+
+      const handleLaunch = async () => {
+        if (!idea.trim() || isRunning) return;
+
+        setIsRunning(true);
+        setActiveAgent("Scout");
+        setThoughts([]);
+        setDebateEntries([]);
+        setFinalAssets(null);
+        setActiveTab("landing");
+
+        try {
+          const response = await fetch("/api/swarm/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              idea: idea.trim(),
+              api_key: apiKey.trim() || null,
+              provider: provider,
+              max_debate_rounds: Number(maxDebateRounds)
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder("utf-8");
+          let buffer = "";
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const jsonStr = line.slice(6);
+                try {
+                  const event = JSON.parse(jsonStr);
+                  handleStreamEvent(event);
+                } catch (e) {
+                  console.error("Error processing stream event:", e, jsonStr);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Swarm stream failed:", err);
+          setThoughts(prev => [...prev, {
+            agent: "system",
+            message: `Stream connection error: ${err.message}`,
+            status: "error",
+            timestamp: "0.00"
+          }]);
+        } finally {
+          setIsRunning(false);
+          setActiveAgent(null);
+        }
+      };
+
+      const copyToClipboard = (text, label) => {
+        navigator.clipboard.writeText(text);
+        setCopiedText(label);
+        setTimeout(() => setCopiedText(""), 2000);
+      };
+
+      const downloadFile = (content, filename, type) => {
+        const blob = new Blob([content], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      return (
+        <div className="flex flex-col min-h-screen bg-gh-canvas text-gh-fg">
+          
+          {/* GitHub Header Navigation Bar */}
+          <header className="border-b border-gh-border bg-gh-subtle sticky top-0 z-40">
+            <div className="max-w-[1720px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 h-16 flex items-center justify-between">
+              
+              <div className="flex items-center space-x-3.5">
+                {/* GitHub-style octicon mark */}
+                <div className="w-8 h-8 rounded-full bg-gh-inset border border-gh-border flex items-center justify-center text-gh-fg">
+                  <Icon name="gitBranch" className="w-4 h-4 text-gh-fg" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold text-sm tracking-tight text-gh-fg">
+                      ventureswarm <span className="text-gh-fgMuted">/</span> <strong className="text-gh-fg font-bold">engine</strong>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-[#1f6feb]/15 text-gh-blueText border border-[#1f6feb]/30">
+                      Public
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-gh-fgMuted font-mono flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-gh-greenText inline-block"></span>
+                    <span>Multi-Agent GTM Swarm</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <button 
+                  onClick={() => setShowSettings(!showSettings)}
+                  className={`gh-btn-secondary flex items-center space-x-2 px-3.5 py-1.5 text-xs font-medium rounded-md ${showSettings ? 'border-gh-fgMuted bg-gh-overlay text-gh-fg' : ''}`}
+                >
+                  <Icon name="sliders" className="w-3.5 h-3.5" />
+                  <span>Settings</span>
+                </button>
+
+                <div className="hidden sm:flex items-center space-x-2 px-3.5 py-1.5 bg-gh-subtle border border-gh-border rounded-md text-xs font-mono text-gh-fgMuted">
+                  <Icon name="activity" className="w-3.5 h-3.5 text-gh-greenText" />
+                  <span>Debate: <span className="text-gh-fg font-semibold">{maxDebateRounds} cycles</span></span>
+                </div>
+              </div>
+            </div>
+
+            {/* Config Drawer */}
+            {showSettings && (
+              <div className="border-t border-gh-border bg-gh-inset px-4 sm:px-6 lg:px-8 xl:px-10 py-5">
+                <div className="max-w-[1720px] w-full mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                  <div>
+                    <label className="block text-gh-fg font-medium mb-1.5 font-mono">API KEY (GEMINI OR OPENAI - OPTIONAL)</label>
+                    <input 
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="Leave blank to use built-in Swarm engine"
+                      className="w-full px-3.5 py-2.5 bg-gh-subtle border border-gh-border rounded-md text-gh-fg font-mono placeholder-gh-fgSubtle focus:outline-none focus:border-gh-blueText focus:ring-1 focus:ring-gh-blueText"
+                    />
+                    <p className="text-[11px] text-gh-fgMuted mt-1.5">Runs deterministic swarm intelligence with live DuckDuckGo web search if blank.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-gh-fg font-medium mb-1.5 font-mono">PROVIDER ENGINE</label>
+                    <select 
+                      value={provider}
+                      onChange={(e) => setProvider(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gh-subtle border border-gh-border rounded-md text-gh-fg font-mono focus:outline-none focus:border-gh-blueText"
+                    >
+                      <option value="auto">Auto-Detect (Gemini 3.8 Flash / OpenAI / Local)</option>
+                      <option value="gemini">Google Gemini (gemini-3.8-flash)</option>
+                      <option value="openai">OpenAI (gpt-4o)</option>
+                      <option value="simulation">Offline Heuristic Swarm</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-gh-fg font-medium mb-1.5 font-mono">MAX DEBATE ROUNDS (CRITIQUE LOOP)</label>
+                    <div className="flex items-center space-x-3 bg-gh-subtle p-2.5 border border-gh-border rounded-md">
+                      <input 
+                        type="range"
+                        min="1"
+                        max="3"
+                        value={maxDebateRounds}
+                        onChange={(e) => setMaxDebateRounds(e.target.value)}
+                        className="w-full accent-gh-greenText cursor-pointer"
+                      />
+                      <span className="font-mono bg-gh-inset text-gh-blueText border border-gh-border font-bold text-xs px-2.5 py-1 rounded">
+                        {maxDebateRounds}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gh-fgMuted mt-1.5">Critique iterations between Overwatch and Wordsmith before launch.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </header>
+
+          {/* Main Swarm Interface */}
+          <main className="flex-1 max-w-[1720px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-8 flex flex-col space-y-8">
+            
+            {/* Swarm Input & Action Deck (Spacious, Un-clustered Design) */}
+            <div className="bg-gh-subtle border border-gh-border rounded-xl p-6 lg:p-7 shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                <div>
+                  <h1 className="text-lg font-semibold text-gh-fg flex items-center gap-2.5">
+                    <span>Autonomous Venture Command</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-mono bg-[#238636]/15 text-gh-greenText border border-[#238636]/30">
+                      Swarm Ready
+                    </span>
+                  </h1>
+                  <p className="text-xs sm:text-sm text-gh-fgMuted mt-1">
+                    Enter a raw business concept. Autonomous agents research market verticals, scrape competitors live, debate conversion copy, and assemble launch assets.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col lg:flex-row gap-4 items-stretch">
+                <div className="relative flex-1">
+                  <textarea
+                    rows={3}
+                    value={idea}
+                    onChange={(e) => setIdea(e.target.value)}
+                    placeholder="Describe your startup concept (e.g. AI agent that helps boutique design agencies automate client onboarding and proposal teardowns...)"
+                    className="w-full px-4 py-3 bg-gh-inset border border-gh-border rounded-lg text-gh-fg placeholder-gh-fgSubtle text-xs sm:text-sm font-mono focus:outline-none focus:border-gh-blueText focus:ring-1 focus:ring-gh-blueText resize-none leading-relaxed"
+                  />
+                </div>
+
+                <button
+                  disabled={isRunning || !idea.trim()}
+                  onClick={handleLaunch}
+                  className={`gh-btn-primary px-7 py-3 rounded-lg font-semibold text-xs sm:text-sm tracking-wide text-white flex items-center justify-center space-x-2.5 shadow-sm transition-all self-stretch lg:self-auto min-w-[200px] ${isRunning || !idea.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isRunning ? (
+                    <>
+                      <Icon name="loader2" className="w-4 h-4 text-white" />
+                      <span>Swarm Running...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="play" className="w-3.5 h-3.5 text-white fill-current" />
+                      <span>Run Swarm Workflow</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Spacious Preset Shelf */}
+              <div className="mt-4 pt-3.5 border-t border-gh-border/60 flex flex-wrap items-center gap-2.5">
+                <span className="text-xs font-mono text-gh-fgMuted flex items-center gap-1.5 mr-1">
+                  <Icon name="sliders" className="w-3 h-3 text-gh-fgMuted" />
+                  <span>Quick Presets:</span>
+                </span>
+                {SAMPLE_IDEAS.map((sample, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setIdea(sample)}
+                    className="gh-btn-secondary px-3 py-1.5 text-xs font-mono rounded-md hover:border-gh-blueText transition-colors text-gh-fg truncate max-w-xs sm:max-w-md lg:max-w-none"
+                    title={sample}
+                  >
+                    💡 {sample.length > 55 ? sample.slice(0, 52) + "..." : sample}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Agent Topology Graph (Roomy, Breathable Node Grid) */}
+            <div className="bg-gh-subtle border border-gh-border rounded-xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gh-border">
+                <div className="flex items-center space-x-2.5">
+                  <Icon name="network" className="w-4 h-4 text-gh-blueText" />
+                  <span className="text-xs sm:text-sm font-mono font-semibold tracking-wide text-gh-fg uppercase">Workflow Graph & Handoff State</span>
+                </div>
+                <div className="text-xs font-mono">
+                  {isRunning ? (
+                    <span className="px-2.5 py-1 rounded-full bg-[#1f6feb]/15 text-gh-blueText border border-[#1f6feb]/40 animate-pulse font-medium">
+                      ● Active Workflow Running
+                    </span>
+                  ) : finalAssets ? (
+                    <span className="px-2.5 py-1 rounded-full bg-[#238636]/15 text-gh-greenText border border-[#238636]/40 font-medium">
+                      ✓ All Checks Passed
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full bg-gh-inset text-gh-fgMuted border border-gh-border">
+                      Idle / Standby
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 xl:gap-5">
+                {AGENT_NODES.map((agent) => {
+                  const isActive = activeAgent === agent.id;
+                  const isDone = finalAssets || thoughts.some(t => t.agent === agent.id && t.status === "completed");
+
+                  return (
+                    <div
+                      key={agent.id}
+                      className={`p-4 rounded-xl border transition-all flex flex-col justify-between min-h-[130px] ${
+                        isActive 
+                          ? 'bg-gh-inset border-gh-blueText gh-active-pulse shadow-md' 
+                          : isDone 
+                            ? 'bg-gh-inset/70 border-gh-border hover:border-gh-fgMuted' 
+                            : 'bg-gh-inset/30 border-gh-borderMuted opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center bg-gh-subtle border border-gh-border ${agent.color}`}>
+                          <Icon name={agent.icon} className="w-4 h-4" />
+                        </div>
+                        {isActive ? (
+                          <span className="w-2.5 h-2.5 rounded-full bg-gh-blueText animate-ping"></span>
+                        ) : isDone ? (
+                          <Icon name="checkCircle" className="w-4 h-4 text-gh-greenText" />
+                        ) : (
+                          <span className="w-2 h-2 rounded-full bg-gh-fgSubtle/60"></span>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="text-xs sm:text-sm font-semibold text-gh-fg">{agent.label}</div>
+                        <div className="text-[11px] text-gh-fgMuted font-mono mt-0.5">{agent.role}</div>
+                      </div>
+
+                      {agent.id === "Overwatch" && (
+                        <div className="mt-2.5 pt-1.5 border-t border-gh-border/70 text-[10px] font-mono text-gh-orangeText flex items-center justify-between">
+                          <span>Debate</span>
+                          <span>↔ Loop</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Split Operations Deck: Left (Logs & Debate) | Right (Artifacts Deck) */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+              
+              {/* Left Column (5 Cols on XL screens): GitHub Actions Log Stream & Debate Ledger */}
+              <div className="xl:col-span-5 flex flex-col space-y-6">
+                
+                {/* Actions Log Runner Terminal */}
+                <div className="bg-gh-subtle border border-gh-border rounded-xl flex flex-col h-[460px] overflow-hidden shadow-sm">
+                  <div className="px-5 py-3 bg-gh-subtle border-b border-gh-border flex items-center justify-between text-xs">
+                    <div className="flex items-center space-x-2.5">
+                      <Icon name="terminal" className="w-4 h-4 text-gh-fgMuted" />
+                      <span className="font-mono font-semibold text-gh-fg">workflow-logs</span>
+                    </div>
+                    <span className="text-xs font-mono text-gh-fgMuted">{thoughts.length} steps</span>
+                  </div>
+
+                  <div className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-2.5 bg-gh-inset">
+                    {thoughts.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gh-fgMuted">
+                        <Icon name="terminal" className="w-9 h-9 mb-2.5 opacity-40 text-gh-fgMuted" />
+                        <p className="text-xs font-medium">No active workflow run.</p>
+                        <p className="text-[11px] text-gh-fgSubtle mt-1">Click "Run Swarm Workflow" to trigger telemetry streaming.</p>
+                      </div>
+                    ) : (
+                      thoughts.map((item, idx) => {
+                        const statusBadge = {
+                          active: "text-gh-blueText bg-[#1f6feb]/15 border-[#1f6feb]/30",
+                          tool: "text-cyan-400 bg-cyan-950/40 border-cyan-700/40",
+                          critique: "text-gh-redText bg-[#da3633]/15 border-[#da3633]/30",
+                          approved: "text-gh-greenText bg-[#238636]/15 border-[#238636]/30",
+                          completed: "text-gh-fgMuted bg-gh-subtle border-gh-border",
+                          system: "text-gh-orangeText bg-[#d29922]/15 border-[#d29922]/30",
+                          error: "text-white bg-gh-red border-red-500"
+                        }[item.status] || "text-gh-fgMuted bg-gh-subtle border-gh-border";
+
+                        return (
+                          <div key={idx} className="flex items-start space-x-2.5 text-xs leading-relaxed py-0.5">
+                            <span className="text-gh-fgSubtle select-none font-mono min-w-[42px]">{item.timestamp}s</span>
+                            <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-medium border ${statusBadge}`}>
+                              {item.agent}
+                            </span>
+                            <span className="text-gh-fg flex-1 font-mono break-words">{item.message}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                    <div ref={thoughtsEndRef} />
+                  </div>
+                </div>
+
+                {/* Agentic Debate Check Run (GitHub PR Review / Check Run Style) */}
+                <div className="bg-gh-subtle border border-gh-border rounded-xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-gh-border">
+                    <div className="flex items-center space-x-2.5">
+                      <Icon name="gitPullRequest" className="w-4 h-4 text-gh-purpleText" />
+                      <span className="text-sm font-semibold text-gh-fg">Debate Verification Checks</span>
+                    </div>
+                    {finalAssets && (
+                      <span className="px-2.5 py-1 text-xs font-mono font-medium rounded-full bg-[#238636]/15 text-gh-greenText border border-[#238636]/30">
+                        Score: {finalAssets.final_score}/100 Passed
+                      </span>
+                    )}
+                  </div>
+
+                  {debateEntries.length === 0 ? (
+                    <div className="text-gh-fgMuted text-xs font-mono py-6 text-center bg-gh-inset rounded-lg border border-dashed border-gh-border">
+                      Debate loop triggers once Wordsmith submits assets for Overwatch audit.
+                    </div>
+                  ) : (
+                    <div className="space-y-3.5">
+                      {debateEntries.map((entry, idx) => {
+                        const isPass = entry.verdict === 'APPROVE';
+                        return (
+                          <div key={idx} className={`p-4 rounded-xl border text-xs font-mono ${isPass ? 'bg-[#238636]/10 border-[#238636]/30' : 'bg-[#da3633]/10 border-[#da3633]/30'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`font-semibold text-xs sm:text-sm flex items-center gap-2 ${isPass ? 'text-gh-greenText' : 'text-gh-redText'}`}>
+                                {isPass ? <Icon name="checkCircle" className="w-4 h-4 text-gh-greenText" /> : <Icon name="xCircle" className="w-4 h-4 text-gh-redText" />}
+                                <span>Cycle #{entry.round}: {entry.verdict}</span>
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-gh-inset text-xs font-mono text-gh-fg font-medium border border-gh-border/60">
+                                {entry.score}/100
+                              </span>
+                            </div>
+                            
+                            {entry.flaws && entry.flaws.length > 0 && (
+                              <div className="mt-3 text-xs text-gh-fg space-y-1.5">
+                                <span className="block text-[11px] uppercase font-bold text-gh-redText">
+                                  Strategist Redlines:
+                                </span>
+                                {entry.flaws.map((flaw, fIdx) => (
+                                  <div key={fIdx} className="flex items-start gap-2 text-gh-fgMuted leading-relaxed">
+                                    <span className="text-gh-redText mt-0.5">✖</span>
+                                    <span className="text-gh-fg">{flaw}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {entry.directives && entry.directives.length > 0 && (
+                              <div className="mt-3 text-xs text-gh-fg space-y-1.5">
+                                <span className="block text-[11px] uppercase font-bold text-gh-orangeText">
+                                  Copywriter Action Directives:
+                                </span>
+                                {entry.directives.map((dir, dIdx) => (
+                                  <div key={dIdx} className="flex items-start gap-2 text-gh-fgMuted leading-relaxed">
+                                    <span className="text-gh-orangeText mt-0.5">➜</span>
+                                    <span className="text-gh-fg">{dir}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Right Column (7 Cols on XL screens): Deployable Assets Deck */}
+              <div className="xl:col-span-7 bg-gh-subtle border border-gh-border rounded-xl flex flex-col min-h-[820px] overflow-hidden shadow-sm">
+                
+                {/* GitHub-style Repository Nav Tabs */}
+                <div className="px-5 pt-1 bg-gh-subtle border-b border-gh-border flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto">
+                    {TABS.map(tab => {
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id)}
+                          className={`flex items-center space-x-2 px-3.5 py-3.5 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
+                            isActive 
+                              ? 'text-gh-fg border-[#f78166] font-semibold' 
+                              : 'text-gh-fgMuted border-transparent hover:text-gh-fg hover:border-gh-border'
+                          }`}
+                        >
+                          <Icon name={tab.icon} className="w-4 h-4" />
+                          <span>{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {finalAssets && (
+                    <div className="flex items-center space-x-2.5 py-2">
+                      {activeTab === "landing" && (
+                        <>
+                          <button
+                            onClick={() => setLandingPreviewMode(landingPreviewMode === "preview" ? "code" : "preview")}
+                            className="gh-btn-secondary px-3 py-1.5 text-xs font-mono rounded-md"
+                          >
+                            {landingPreviewMode === "preview" ? "</> View HTML" : "👁 Live Preview"}
+                          </button>
+                          <button
+                            onClick={() => downloadFile(finalAssets.landing_page_html, `${finalAssets.brand_name.toLowerCase()}-landing.html`, "text/html")}
+                            className="gh-btn-primary flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold text-white rounded-md"
+                          >
+                            <Icon name="download" className="w-3.5 h-3.5 text-white" />
+                            <span>Download HTML</span>
+                          </button>
+                        </>
+                      )}
+
+                      {activeTab === "leads" && (
+                        <button
+                          onClick={() => downloadFile(finalAssets.leads_csv, `${finalAssets.brand_name.toLowerCase()}-leads.csv`, "text/csv")}
+                          className="gh-btn-primary flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold text-white rounded-md"
+                        >
+                          <Icon name="download" className="w-3.5 h-3.5 text-white" />
+                          <span>Export CSV</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tab Contents Canvas - Guaranteed Deep Dark Background with Strict Contrast & Roomy Padding */}
+                <div className="flex-1 overflow-y-auto p-6 sm:p-7 bg-gh-canvas">
+                  {!finalAssets ? (
+                    <div className="h-full min-h-[500px] flex flex-col items-center justify-center text-center p-8 text-gh-fgMuted">
+                      <div className="w-14 h-14 rounded-2xl bg-gh-subtle border border-gh-border flex items-center justify-center mb-4 shadow-sm">
+                        <Icon name="layers" className="w-7 h-7 text-gh-fgMuted" />
+                      </div>
+                      <h3 className="text-base font-semibold text-gh-fg">Artifacts Awaiting Workflow Completion</h3>
+                      <p className="text-xs sm:text-sm text-gh-fgMuted max-w-md mt-1.5 leading-relaxed">
+                        Once the agents complete live research, competitor scraping, and debate verification, production assets will render here with instant live export.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      {/* TAB 1: LANDING PAGE (Solid Dark Container - No Light Bleed!) */}
+                      {activeTab === "landing" && (
+                        <div className="h-full">
+                          {landingPreviewMode === "preview" ? (
+                            <div className="border border-gh-border rounded-xl bg-[#0d1117] h-[680px] flex flex-col overflow-hidden shadow-xl">
+                              <div className="h-10 bg-[#161b22] border-b border-gh-border px-4 flex items-center justify-between text-xs font-mono text-gh-fgMuted">
+                                <div className="flex items-center space-x-2">
+                                  <span className="w-2.5 h-2.5 rounded-full bg-[#f85149]"></span>
+                                  <span className="w-2.5 h-2.5 rounded-full bg-[#d29922]"></span>
+                                  <span className="w-2.5 h-2.5 rounded-full bg-[#3fb950]"></span>
+                                </div>
+                                <span className="font-medium text-gh-fg">https://{finalAssets.brand_name.toLowerCase()}.io</span>
+                                <span className="text-[10px] bg-[#21262d] text-gh-blueText font-medium px-2.5 py-0.5 rounded-full border border-gh-border">100% RESPONSIVE</span>
+                              </div>
+                              <iframe
+                                srcDoc={finalAssets.landing_page_html}
+                                title="Landing Page Preview"
+                                className="w-full flex-1 border-0 bg-[#0d1117]"
+                                sandbox="allow-scripts allow-modals allow-forms"
+                              />
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              <button
+                                onClick={() => copyToClipboard(finalAssets.landing_page_html, "html")}
+                                className="gh-btn-secondary absolute top-4 right-4 px-3.5 py-1.5 text-xs font-mono rounded-md shadow-sm"
+                              >
+                                {copiedText === "html" ? "✓ Copied!" : "Copy HTML"}
+                              </button>
+                              <pre className="p-5 bg-gh-inset text-[#3fb950] font-mono text-xs border border-gh-border rounded-xl overflow-x-auto h-[680px] leading-relaxed">
+                                <code>{finalAssets.landing_page_html}</code>
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* TAB 2: OUTBOUND EMAIL CADENCE */}
+                      {activeTab === "emails" && (
+                        <div className="space-y-5">
+                          <div className="flex items-center justify-between bg-gh-subtle p-4 rounded-xl border border-gh-border">
+                            <span className="text-xs font-mono font-medium text-gh-fgMuted uppercase tracking-wider">4-Touch Cold Cadence (Debate Audited)</span>
+                            <button
+                              onClick={() => copyToClipboard(JSON.stringify(finalAssets.outbound_sequence, null, 2), "cadence")}
+                              className="gh-btn-secondary px-3 py-1.5 text-xs font-mono rounded-md"
+                            >
+                              {copiedText === "cadence" ? "✓ Copied All" : "Copy Sequence"}
+                            </button>
+                          </div>
+
+                          {finalAssets.outbound_sequence.map((email, idx) => (
+                            <div key={idx} className="bg-gh-subtle border border-gh-border rounded-xl p-5 sm:p-6 space-y-3 shadow-sm">
+                              <div className="flex items-center justify-between pb-3 border-b border-gh-border">
+                                <span className="text-xs font-mono font-medium px-2.5 py-1 rounded-full bg-[#1f6feb]/15 text-gh-blueText border border-[#1f6feb]/30">
+                                  Touch #{email.step}: {email.touch_type}
+                                </span>
+                                <button
+                                  onClick={() => copyToClipboard(`Subject: ${email.subject}\n\n${email.body}`, `email-${idx}`)}
+                                  className="gh-btn-secondary text-xs font-mono px-2.5 py-1 rounded"
+                                >
+                                  {copiedText === `email-${idx}` ? "✓ Copied" : "Copy"}
+                                </button>
+                              </div>
+                              <div className="text-xs sm:text-sm font-mono text-gh-fg">
+                                <span className="text-gh-fgSubtle">Subject: </span>
+                                <span className="text-gh-fg font-semibold">{email.subject}</span>
+                              </div>
+                              <div className="text-xs sm:text-sm text-gh-fg font-sans leading-relaxed bg-gh-inset p-4 rounded-lg border border-gh-border whitespace-pre-line">
+                                {email.body}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* TAB 3: COMPETITOR BATTLECARD */}
+                      {activeTab === "battlecard" && (
+                        <div className="space-y-5">
+                          <div className="p-4 sm:p-5 bg-gh-subtle border border-gh-border rounded-xl text-xs sm:text-sm shadow-sm">
+                            <span className="font-mono text-gh-orangeText font-semibold uppercase tracking-wider block mb-1">Identified Market Whitespace:</span>
+                            <p className="text-gh-fg text-sm sm:text-base leading-relaxed">{finalAssets.competitor_data?.market_whitespace}</p>
+                          </div>
+
+                          <div className="overflow-x-auto border border-gh-border rounded-xl bg-gh-subtle shadow-sm">
+                            <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                              <thead>
+                                <tr className="border-b border-gh-border bg-gh-inset font-mono text-gh-fgMuted uppercase tracking-wider">
+                                  <th className="px-5 py-3.5">Competitor Entity</th>
+                                  <th className="px-5 py-3.5">Live Pricing Signals</th>
+                                  <th className="px-5 py-3.5">Critical Vulnerability</th>
+                                  <th className="px-5 py-3.5">Our Counter-Attack</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {finalAssets.competitor_data?.battlecard?.map((comp, i) => (
+                                  <tr key={i} className="border-b border-gh-border hover:bg-gh-overlay transition-colors">
+                                    <td className="px-5 py-4 font-semibold text-gh-fg">
+                                      <div className="text-sm">{comp.name}</div>
+                                      <a href={comp.url} target="_blank" rel="noreferrer" className="text-xs text-gh-blueText hover:underline font-mono">
+                                        {comp.url}
+                                      </a>
+                                    </td>
+                                    <td className="px-5 py-4 font-mono text-gh-fgMuted">{comp.pricing_model}</td>
+                                    <td className="px-5 py-4 text-gh-redText leading-relaxed">{comp.critical_weakness}</td>
+                                    <td className="px-5 py-4 text-gh-greenText leading-relaxed">{comp.our_counter_attack}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TAB 4: SIMULATED LEADS DATABASE */}
+                      {activeTab === "leads" && (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between text-xs sm:text-sm font-mono text-gh-fgMuted bg-gh-subtle p-4 rounded-xl border border-gh-border">
+                            <span>High-Intent Prospect ICP List (Simulated)</span>
+                            <span className="px-2.5 py-1 rounded-full bg-[#238636]/15 text-gh-greenText border border-[#238636]/30 font-medium">
+                              {finalAssets.leads_csv.split('\n').length - 2} Prospects Ready
+                            </span>
+                          </div>
+
+                          <div className="overflow-x-auto border border-gh-border rounded-xl bg-gh-subtle text-xs sm:text-sm shadow-sm">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="border-b border-gh-border bg-gh-inset font-mono text-gh-fgMuted uppercase tracking-wider">
+                                  <th className="px-5 py-3.5">Lead Name</th>
+                                  <th className="px-5 py-3.5">Job Title</th>
+                                  <th className="px-5 py-3.5">Company</th>
+                                  <th className="px-5 py-3.5">Budget</th>
+                                  <th className="px-5 py-3.5">Personalized Hook Angle</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {finalAssets.leads_csv.split('\n').slice(1, 9).map((row, rIdx) => {
+                                  const cols = row.split(',');
+                                  if (cols.length < 5) return null;
+                                  return (
+                                    <tr key={rIdx} className="border-b border-gh-border hover:bg-gh-overlay transition-colors">
+                                      <td className="px-5 py-4 font-semibold text-gh-fg">
+                                        <div className="text-sm">{cols[0]} {cols[1]}</div>
+                                        <div className="text-[11px] text-gh-fgSubtle font-mono mt-0.5">{cols[8]}</div>
+                                      </td>
+                                      <td className="px-5 py-4 text-gh-fg">{cols[2]}</td>
+                                      <td className="px-5 py-4 text-gh-fg">
+                                        <div className="font-medium">{cols[3]}</div>
+                                        <div className="text-[11px] text-gh-fgSubtle font-mono mt-0.5">{cols[4]} ({cols[5]} emp)</div>
+                                      </td>
+                                      <td className="px-5 py-4 font-mono text-gh-orangeText font-medium">{cols[6]}</td>
+                                      <td className="px-5 py-4 text-gh-fgMuted text-xs leading-relaxed max-w-sm">{cols[7]}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TAB 5: ICP DOSSIER */}
+                      {activeTab === "icp" && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs sm:text-sm">
+                          <div className="bg-gh-subtle border border-gh-border p-6 rounded-xl shadow-sm">
+                            <span className="text-[11px] font-mono uppercase font-semibold text-gh-blueText tracking-wider">Target Decision Maker</span>
+                            <h3 className="text-lg font-semibold text-gh-fg mt-1.5 mb-3">{finalAssets.persona_data?.icp_title}</h3>
+                            <div className="space-y-2 font-mono text-gh-fgMuted text-xs sm:text-sm">
+                              <div>Industry: <span className="text-gh-fg">{finalAssets.persona_data?.company_profile?.industry}</span></div>
+                              <div>Company Size: <span className="text-gh-fg">{finalAssets.persona_data?.company_profile?.size}</span></div>
+                              <div>Target Budget: <span className="text-gh-orangeText font-medium">{finalAssets.persona_data?.willingness_to_pay}</span></div>
+                            </div>
+                          </div>
+
+                          <div className="bg-gh-subtle border border-gh-border p-6 rounded-xl shadow-sm">
+                            <span className="text-[11px] font-mono uppercase font-semibold text-gh-redText tracking-wider">Acute Bleeding Pain Points</span>
+                            <ul className="mt-3 space-y-2.5 text-gh-fg">
+                              {finalAssets.persona_data?.acute_pain_points?.map((pain, i) => (
+                                <li key={i} className="flex items-start gap-2.5 bg-gh-inset p-3 rounded-lg border border-gh-border leading-relaxed text-xs sm:text-sm">
+                                  <span className="text-gh-redText mt-0.5">•</span>
+                                  <span>{pain}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          <div className="md:col-span-2 bg-gh-subtle border border-gh-border p-6 rounded-xl shadow-sm">
+                            <span className="text-[11px] font-mono uppercase font-semibold text-gh-greenText tracking-wider">Objection Pre-emption Matrix</span>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                              {finalAssets.persona_data?.key_objections?.map((obj, i) => (
+                                <div key={i} className="p-4 bg-gh-inset rounded-lg border border-gh-border space-y-1.5">
+                                  <div className="font-semibold text-gh-fg">"{obj.objection}"</div>
+                                  <div className="text-gh-greenText text-xs sm:text-sm leading-relaxed">→ {obj.counter_proof}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+            </div>
+
+          </main>
+        </div>
+      );
+    }
+
+    // Modern React 18 createRoot
+    const container = document.getElementById("root");
+    const root = ReactDOM.createRoot(container);
+    root.render(<App />);
+  </script>
+</body>
+</html>
